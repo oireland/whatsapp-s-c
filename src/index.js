@@ -95,6 +95,51 @@ client.on('message_create', async (message) => {
     return;
   }
 
+  // DEV COMMANDS (Only available to ADMIN_PHONE_NUMBER)
+  const isAdmin = process.env.ADMIN_PHONE_NUMBER && message.from.includes(process.env.ADMIN_PHONE_NUMBER);
+  if (isAdmin && message.body && message.body.trim().toLowerCase().startsWith('!dev-')) {
+    const cmd = message.body.trim().toLowerCase();
+    const feedGroupId = process.env.FEED_GROUP_ID;
+
+    if (cmd === '!dev-workout') {
+      console.log(`🛠️ [Dev Command] Simulating workout broadcast to group: ${feedGroupId}...`);
+      const testWorkoutText = `🔥 *DEMO ATHLETE*\n_Position: Flanker_\n\n🏆 *Type*: Gym / Weights 🏋️‍♂️\n⏱️ *Duration*: 60 mins (RPE: 8/10)\n📝 *Notes*: "This is a simulated dev workout to check group styling. deadlift PR!"\n\n📈 *Points*: *+15 pts* (+5 pt Media Bonus!)`;
+      try {
+        if (feedGroupId && feedGroupId !== 'dummy-feed-group-id@g.us') {
+          await client.sendMessage(feedGroupId, testWorkoutText, { sendSeen: false });
+          await client.sendMessage(message.from, `✅ Simulated workout broadcast posted successfully to feed group!`);
+        } else {
+          await client.sendMessage(message.from, `❌ Dev Broadcast failed: FEED_GROUP_ID is not configured in .env`);
+        }
+      } catch (err) {
+        console.error('Failed to send dev workout simulation:', err);
+        await client.sendMessage(message.from, `❌ Dev Broadcast error: ${err.message}`);
+      }
+      return;
+    }
+
+    if (cmd === '!dev-weekly') {
+      console.log(`🛠️ [Dev Command] Simulating weekly highlights broadcast to group: ${feedGroupId}...`);
+      try {
+        import('./scheduler.js').then(async (module) => {
+          const report = module.generateWeeklyReport();
+          if (feedGroupId && feedGroupId !== 'dummy-feed-group-id@g.us') {
+            await client.sendMessage(feedGroupId, report, { sendSeen: false });
+            await client.sendMessage(message.from, `✅ Weekly highlights report simulated and posted successfully to feed group!`);
+          } else {
+            await client.sendMessage(message.from, `❌ Dev Broadcast failed: FEED_GROUP_ID is not configured in .env`);
+          }
+        }).catch(async (err) => {
+          await client.sendMessage(message.from, `❌ Error loading scheduler module: ${err.message}`);
+        });
+      } catch (err) {
+        console.error('Failed to send dev weekly summary simulation:', err);
+        await client.sendMessage(message.from, `❌ Dev Broadcast error: ${err.message}`);
+      }
+      return;
+    }
+  }
+
   try {
     const sender = message.from;
     const body = message.body;
