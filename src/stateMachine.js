@@ -4,7 +4,8 @@ import db, {
   saveSessionState,
   getSessionState,
   deleteSessionState,
-  createWorkout
+  createWorkout,
+  updatePlayer
 } from './db.js';
 
 // Base points for each workout type
@@ -51,8 +52,16 @@ export async function handleIncomingMessage(phone, text, media = null) {
     }
 
     if (state.step === 'ONBOARDING_NAME') {
-      if (!cleanText) {
-        return { replyText: 'Please enter a valid name:' };
+      const lowerName = cleanText.toLowerCase();
+      const isGreetingOrCmd = [
+        'hi', 'hello', 'hey', 'yo', 'start', 'help', 'menu', 
+        'register', 'signup', 'log', 'stats', 'cancel'
+      ].includes(lowerName);
+
+      if (!cleanText || isGreetingOrCmd) {
+        return {
+          replyText: 'Welcome! Let\'s get you set up. What is your full name? (Please enter your name, not a greeting like "hi" or "hello")'
+        };
       }
       saveSessionState(phone, 'ONBOARDING_POSITION', { name: cleanText });
       return {
@@ -65,6 +74,20 @@ export async function handleIncomingMessage(phone, text, media = null) {
         return { replyText: 'Please enter a valid position:' };
       }
       const name = state.temp_data.name;
+      const lowerName = (name || '').trim().toLowerCase();
+      const isNameGlitch = [
+        'hi', 'hello', 'hey', 'yo', 'start', 'help', 'menu', 
+        'register', 'signup', 'log', 'stats', 'cancel'
+      ].includes(lowerName);
+
+      if (isNameGlitch) {
+        // Self-heal: reset state to onboarding name since the stored name is a greeting
+        saveSessionState(phone, 'ONBOARDING_NAME', {});
+        return {
+          replyText: 'Sorry, we caught a glitch with your registration name. Let\'s try again. What is your full name?'
+        };
+      }
+
       const position = cleanText;
 
       // Register player
@@ -109,9 +132,17 @@ export async function handleIncomingMessage(phone, text, media = null) {
       };
     }
 
+    if (lowerText === 'edit') {
+      saveSessionState(phone, 'EDIT_NAME', {});
+      return {
+        replyText: `Let's update your profile.\n\nYour current name is *${player.name}*.\nWhat is your new full name? (Reply with 'skip' to keep your current name)`
+      };
+    }
+    // --------------------------
+
     // Default message when registered and idle
     return {
-      replyText: `Hi *${player.name}*!\n\nSend *'log'* to log a new workout session.\nSend *'stats'* to see your progress.\n\nType *'cancel'* at any point during logging to reset.`
+      replyText: `Hi *${player.name}*!\n\nSend *'log'* to log a new workout session.\nSend *'stats'* to see your progress.\nSend *'edit'* to update your name or position.\n\nType *'cancel'* at any point during logging to reset.`
     };
   }
 
@@ -228,6 +259,33 @@ export async function handleIncomingMessage(phone, text, media = null) {
         broadcastText: broadcastText,
         broadcastMedia: media, // Forward the media object so index.js can send it
         logSuccessful: true
+      };
+    }
+
+    case 'EDIT_NAME': {
+      // Use the existing name if they type 'skip'
+      const newName = lowerText === 'skip' ? player.name : cleanText;
+      tempData.name = newName;
+      
+      saveSessionState(phone, 'EDIT_POSITION', tempData);
+      return {
+        replyText: `Your current position is *${player.position}*.\nWhat is your new position? (Reply with 'skip' to keep your current position)`
+      };
+    }
+
+    case 'EDIT_POSITION': {
+      // Use the existing position if they type 'skip'
+      const newPosition = lowerText === 'skip' ? player.position : cleanText;
+      tempData.position = newPosition;
+
+      // Save the changes to the database
+      updatePlayer(phone, tempData.name, tempData.position);
+      
+      // Clean up the session state so they return to the main menu
+      deleteSessionState(phone);
+
+      return {
+        replyText: `✅ Profile updated successfully!\n\nYou are now registered as *${tempData.name} (${tempData.position})*.`
       };
     }
 

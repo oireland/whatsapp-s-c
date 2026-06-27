@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 process.env.NODE_ENV = 'test';
 
 // 2. Import helper database methods and state machine
-import db, { getPlayer, getSessionState, createPlayer } from '../src/db.js';
+import db, { getPlayer, getSessionState, createPlayer, saveSessionState } from '../src/db.js';
 import { handleIncomingMessage } from '../src/stateMachine.js';
 import { generateWeeklyReport } from '../src/scheduler.js';
 
@@ -38,12 +38,28 @@ async function runTests() {
     assert.match(res.replyText, /Welcome to the Uni Rugby S&C Bot/);
     assert.strictEqual(getSessionState(testPhone).step, 'ONBOARDING_NAME');
     console.log('✅ Unregistered greeting triggers onboarding: OK');
+
+    // Step 1.5: Send a greeting/command like "hi" or "log" as name
+    res = await handleIncomingMessage(testPhone, 'hi');
+    assert.match(res.replyText, /Please enter your name, not a greeting/);
+    assert.strictEqual(getSessionState(testPhone).step, 'ONBOARDING_NAME');
+    console.log('✅ Rejecting greetings/commands as name: OK');
     
     // Step 2: Send name
     res = await handleIncomingMessage(testPhone, 'John Doe');
     assert.match(res.replyText, /Got it, John Doe/);
     assert.strictEqual(getSessionState(testPhone).step, 'ONBOARDING_POSITION');
-    console.log('✅ Capturing name and prompting for position: OK');
+    console.log('✅ Capturing valid name and prompting for position: OK');
+
+    // Step 2.5: Test self-healing if database somehow has a glitch name (e.g. "hi")
+    saveSessionState(testPhone, 'ONBOARDING_POSITION', { name: 'hi' });
+    res = await handleIncomingMessage(testPhone, 'Flanker');
+    assert.match(res.replyText, /glitch with your registration name.*What is your full name\?/);
+    assert.strictEqual(getSessionState(testPhone).step, 'ONBOARDING_NAME');
+    console.log('✅ Self-healing glitch name: OK');
+
+    // Clean start for registration
+    res = await handleIncomingMessage(testPhone, 'John Doe');
     
     // Step 3: Send position to complete registration
     res = await handleIncomingMessage(testPhone, 'Flanker');

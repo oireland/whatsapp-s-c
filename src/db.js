@@ -105,4 +105,16 @@ export function getWorkoutsSince(dateString) {
   return stmt.all(dateString);
 }
 
+/**
+ * Update an existing player's details
+ */
+export function updatePlayer(phone, name, position) {
+  const stmt = db.prepare(`
+    UPDATE players 
+    SET name = ?, position = ? 
+    WHERE phone_number = ?
+  `);
+  return stmt.run(name, position, phone);
+}
+
 export default db;

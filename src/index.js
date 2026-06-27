@@ -35,6 +35,7 @@ client.on('qr', (qr) => {
   console.log('📲 ACTION REQUIRED: Scan the QR code below using your WhatsApp app:');
   console.log('   Settings > Linked Devices > Link a Device');
   console.log('==================================================================\n');
+  console.log(`RAW_QR_STRING:${qr}`);
   qrcode.generate(qr, { small: true });
 });
 
@@ -85,10 +86,34 @@ client.on('ready', async () => {
   }
 });
 
+// Deduplication cache for message IDs to prevent double-processing on duplicate events
+const processedMessageIds = new Set();
+const MAX_MSG_CACHE_SIZE = 1000;
+
+function isDuplicateMessage(msgId) {
+  if (processedMessageIds.has(msgId)) {
+    return true;
+  }
+  processedMessageIds.add(msgId);
+  if (processedMessageIds.size > MAX_MSG_CACHE_SIZE) {
+    // Delete the oldest entry to prevent memory leaks (Sets preserve insertion order)
+    const firstKey = processedMessageIds.values().next().value;
+    processedMessageIds.delete(firstKey);
+  }
+  return false;
+}
+
 // Handle incoming messages (using message_create to catch all events, including synced/read DMs)
 client.on('message_create', async (message) => {
   // Ignore messages sent by the bot itself to prevent infinite feedback loops
   if (message.fromMe) {
+    return;
+  }
+
+  // Check and register message ID to prevent processing the same event multiple times
+  const msgId = message.id && message.id._serialized;
+  if (msgId && isDuplicateMessage(msgId)) {
+    console.log(`ℹ️ [Duplicate Event] Skipped already processed message ID: ${msgId}`);
     return;
   }
 
