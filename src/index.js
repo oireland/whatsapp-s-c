@@ -95,61 +95,58 @@ client.on('message_create', async (message) => {
     return;
   }
 
-  // DEV COMMANDS (Only available to ADMIN_PHONE_NUMBER - supports comma-separated list of phone numbers or LIDs)
+  // DEV COMMANDS (Authorized via a secret DEV_COMMAND_PASSWORD token in the message body)
   if (message.body && message.body.trim().toLowerCase().startsWith('!dev-')) {
-    try {
-      const contact = await message.getContact();
-      const adminList = (process.env.ADMIN_PHONE_NUMBER || '').split(',').map(s => s.trim());
-      const isAdmin = adminList.some(adminId => 
-        adminId && (message.from.includes(adminId) || contact.number.includes(adminId))
-      );
-      
-      if (isAdmin) {
-        const cmd = message.body.trim().toLowerCase();
-        const feedGroupId = process.env.FEED_GROUP_ID;
+    const parts = message.body.trim().split(/\s+/);
+    const cmd = parts[0].toLowerCase();
+    const token = parts[1];
 
-        if (cmd === '!dev-workout') {
-          console.log(`🛠️ [Dev Command] Simulating workout broadcast to group: ${feedGroupId}...`);
-          const testWorkoutText = `🔥 *DEMO ATHLETE*\n_Position: Flanker_\n\n🏆 *Type*: Gym / Weights 🏋️‍♂️\n⏱️ *Duration*: 60 mins (RPE: 8/10)\n📝 *Notes*: "This is a simulated dev workout to check group styling. deadlift PR!"\n\n📈 *Points*: *+15 pts* (+5 pt Media Bonus!)`;
-          try {
-            if (feedGroupId && feedGroupId !== 'dummy-feed-group-id@g.us') {
-              await client.sendMessage(feedGroupId, testWorkoutText, { sendSeen: false });
-              await client.sendMessage(message.from, `✅ Simulated workout broadcast posted successfully to feed group!`);
-            } else {
-              await client.sendMessage(message.from, `❌ Dev Broadcast failed: FEED_GROUP_ID is not configured in .env`);
-            }
-          } catch (err) {
-            console.error('Failed to send dev workout simulation:', err);
-            await client.sendMessage(message.from, `❌ Dev Broadcast error: ${err.message}`);
-          }
-          return;
-        }
+    const expectedToken = (process.env.DEV_COMMAND_PASSWORD || '').trim();
 
-        if (cmd === '!dev-weekly') {
-          console.log(`🛠️ [Dev Command] Simulating weekly highlights broadcast to group: ${feedGroupId}...`);
-          try {
-            import('./scheduler.js').then(async (module) => {
-              const report = module.generateWeeklyReport();
-              if (feedGroupId && feedGroupId !== 'dummy-feed-group-id@g.us') {
-                await client.sendMessage(feedGroupId, report, { sendSeen: false });
-                await client.sendMessage(message.from, `✅ Weekly highlights report simulated and posted successfully to feed group!`);
-              } else {
-                await client.sendMessage(message.from, `❌ Dev Broadcast failed: FEED_GROUP_ID is not configured in .env`);
-              }
-            }).catch(async (err) => {
-              await client.sendMessage(message.from, `❌ Error loading scheduler module: ${err.message}`);
-            });
-          } catch (err) {
-            console.error('Failed to send dev weekly summary simulation:', err);
-            await client.sendMessage(message.from, `❌ Dev Broadcast error: ${err.message}`);
-          }
-          return;
+    // Verify token to prevent unauthorized execution
+    if (!expectedToken || token !== expectedToken) {
+      console.warn(`⚠️ [Unauthorized Dev Command] Attempted by ${message.from} with invalid or missing token.`);
+      return;
+    }
+
+    const feedGroupId = process.env.FEED_GROUP_ID;
+
+    if (cmd === '!dev-workout') {
+      console.log(`🛠️ [Dev Command] Simulating workout broadcast to group: ${feedGroupId}...`);
+      const testWorkoutText = `🔥 *DEMO ATHLETE*\n_Position: Flanker_\n\n🏆 *Type*: Gym / Weights 🏋️‍♂️\n⏱️ *Duration*: 60 mins (RPE: 8/10)\n📝 *Notes*: "This is a simulated dev workout to check group styling. deadlift PR!"\n\n📈 *Points*: *+15 pts* (+5 pt Media Bonus!)`;
+      try {
+        if (feedGroupId && feedGroupId !== 'dummy-feed-group-id@g.us') {
+          await client.sendMessage(feedGroupId, testWorkoutText, { sendSeen: false });
+          await client.sendMessage(message.from, `✅ Simulated workout broadcast posted successfully to feed group!`);
+        } else {
+          await client.sendMessage(message.from, `❌ Dev Broadcast failed: FEED_GROUP_ID is not configured in .env`);
         }
-      } else {
-        console.warn(`⚠️ [Unauthorized Dev Command] Attempted by ${message.from} (Phone: ${contact.number})`);
+      } catch (err) {
+        console.error('Failed to send dev workout simulation:', err);
+        await client.sendMessage(message.from, `❌ Dev Broadcast error: ${err.message}`);
       }
-    } catch (err) {
-      console.error('❌ Error executing dev command:', err);
+      return;
+    }
+
+    if (cmd === '!dev-weekly') {
+      console.log(`🛠️ [Dev Command] Simulating weekly highlights broadcast to group: ${feedGroupId}...`);
+      try {
+        import('./scheduler.js').then(async (module) => {
+          const report = module.generateWeeklyReport();
+          if (feedGroupId && feedGroupId !== 'dummy-feed-group-id@g.us') {
+            await client.sendMessage(feedGroupId, report, { sendSeen: false });
+            await client.sendMessage(message.from, `✅ Weekly highlights report simulated and posted successfully to feed group!`);
+          } else {
+            await client.sendMessage(message.from, `❌ Dev Broadcast failed: FEED_GROUP_ID is not configured in .env`);
+          }
+        }).catch(async (err) => {
+          await client.sendMessage(message.from, `❌ Error loading scheduler module: ${err.message}`);
+        });
+      } catch (err) {
+        console.error('Failed to send dev weekly summary simulation:', err);
+        await client.sendMessage(message.from, `❌ Dev Broadcast error: ${err.message}`);
+      }
+      return;
     }
   }
 
