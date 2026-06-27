@@ -67,24 +67,29 @@ client.on('ready', async () => {
   initWeeklyScheduler(client, feedGroupId);
 });
 
-// Handle incoming messages
-client.on('message', async (message) => {
+// Handle incoming messages (using message_create to catch all events, including synced/read DMs)
+client.on('message_create', async (message) => {
+  // Ignore messages sent by the bot itself to prevent infinite feedback loops
+  if (message.fromMe) {
+    return;
+  }
+
+  console.log(`\n📥 [Incoming Event] From: ${message.from} | Type: ${message.type} | Body: "${message.body || '[Media/Special]'}"`);
+
   // If it's a group message, log its ID to help configure FEED_GROUP_ID
   if (message.from.endsWith('@g.us')) {
     try {
       const chat = await message.getChat();
-      console.log(`\n📢 GROUP ID DETECTED:`);
-      console.log(`   Group Name: "${chat.name}"`);
-      console.log(`   Group ID:   "${chat.id._serialized}"`);
-      console.log(`====================================\n`);
+      console.log(`ℹ️ [Group Chat Message] Group Name: "${chat.name}" | Group ID: "${chat.id._serialized}"`);
     } catch (err) {
-      // Ignore errors fetching group details
+      console.warn('⚠️ Failed to fetch details for group message:', err.message);
     }
     return;
   }
 
   // Only respond to personal direct messages (DMs), ignore other types
   if (!message.from.endsWith('@c.us')) {
+    console.log(`ℹ️ [Ignored Message] Sender is not a personal chat contact (e.g. status or broadcast).`);
     return;
   }
 
@@ -94,19 +99,25 @@ client.on('message', async (message) => {
 
     // Retrieve active state to decide if we need to download media
     const state = getSessionState(sender);
+    console.log(`🛠️ [Processing DM] Sender: ${sender} | Current State: ${state ? state.step : 'IDLE (Unregistered or waiting)'}`);
+    
     let media = null;
-
     if (message.hasMedia && state && state.step === 'LOG_MEDIA') {
-      console.log(`Downloading media attachment from ${sender}...`);
+      console.log(`📸 [Media Detected] Downloading media attachment from ${sender}...`);
       media = await message.downloadMedia();
+      console.log(`📸 [Media Loaded] Mimetype: ${media.mimetype} | Size: ${media.data.length} bytes`);
     }
 
     // Process message through state machine
+    console.log(`🧠 [State Machine] Evaluating inputs...`);
     const result = await handleIncomingMessage(sender, body, media);
+    console.log(`🧠 [State Machine Result] Reply text generated: ${result.replyText ? 'Yes' : 'No'} | Log success: ${result.logSuccessful ? 'Yes' : 'No'}`);
 
     // Send reply to sender
     if (result.replyText) {
+      console.log(`📤 [Sending Reply] Sending text to ${sender}...`);
       await client.sendMessage(sender, result.replyText);
+      console.log(`📤 [Reply Sent] Successfully replied to ${sender}`);
     }
 
     // If workout logged successfully, broadcast it to the S&C feed group
@@ -114,6 +125,7 @@ client.on('message', async (message) => {
       const feedGroupId = process.env.FEED_GROUP_ID;
       
       if (feedGroupId && feedGroupId !== 'dummy-feed-group-id@g.us') {
+        console.log(`📢 [Broadcasting Workout] Posting update to feed group: ${feedGroupId}...`);
         if (result.broadcastMedia) {
           await client.sendMessage(feedGroupId, result.broadcastMedia, { 
             caption: result.broadcastText 
@@ -121,13 +133,13 @@ client.on('message', async (message) => {
         } else {
           await client.sendMessage(feedGroupId, result.broadcastText);
         }
-        console.log(`Broadcasted workout for ${sender} to feed group: ${feedGroupId}`);
+        console.log(`📢 [Broadcast Complete] Workout posted for ${sender}`);
       } else {
-        console.warn('⚠️ Workout log was NOT broadcasted: FEED_GROUP_ID is not configured in .env');
+        console.warn('⚠️ [Broadcast Skipped] Workout log was NOT broadcasted: FEED_GROUP_ID is not configured in .env');
       }
     }
   } catch (err) {
-    console.error('Error processing incoming message:', err);
+    console.error('❌ [Error] Failed to process incoming DM:', err);
   }
 });
 
