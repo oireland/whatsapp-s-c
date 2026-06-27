@@ -217,11 +217,11 @@ export async function handleIncomingMessage(phone, text, media = null) {
       const notesText = tempData.notes ? `\n📝 *Notes*: "${tempData.notes}"` : '';
       const mediaBonusText = hasMedia ? ' (+5 pt Media Bonus!)' : '';
 
-      const broadcastText = `🔥 *NEW WORKOUT LOGGED!* 🔥\n\n` +
-        `👤 *Player*: ${player.name} (${player.position})\n` +
+      const broadcastText = `🔥 *${player.name.toUpperCase()}*\n` +
+        `_Position: ${player.position}_\n\n` +
         `🏆 *Type*: ${typeInfo.name}\n` +
         `⏱️ *Duration*: ${tempData.duration} mins (RPE: ${tempData.rpe}/10)${notesText}\n\n` +
-        `📈 *Points Earned*: *+${points} pts*${mediaBonusText}`;
+        `📈 *Points*: *+${points} pts*${mediaBonusText}`;
 
       return {
         replyText: `🏋️‍♂️ *Workout Logged Successfully!*\n\nPoints Earned: *+${points} pts*.\nYour update has been sent to the group feed. Keep up the good work! 🚀`,

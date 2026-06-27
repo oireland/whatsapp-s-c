@@ -101,10 +101,11 @@ async function runTests() {
     // Logging should complete successfully
     assert.ok(res.logSuccessful);
     assert.match(res.replyText, /\+15 pts/); // 10 base + 5 media bonus
-    assert.match(res.broadcastText, /John Doe \(Flanker\)/);
+    assert.match(res.broadcastText, /JOHN DOE/);
+    assert.match(res.broadcastText, /Position: Flanker/);
     assert.match(res.broadcastText, /Gym \/ Weights/);
     assert.match(res.broadcastText, /Hit new squat PR/);
-    assert.match(res.broadcastText, /\*Points Earned\*: \*\+15 pts\*/);
+    assert.match(res.broadcastText, /\*Points\*: \*\+15 pts\*/);
     assert.strictEqual(res.broadcastMedia, mockMedia);
     assert.strictEqual(getSessionState(testPhone), null);
     
@@ -136,7 +137,7 @@ async function runTests() {
     
     assert.ok(res.logSuccessful);
     assert.match(res.replyText, /\+15 pts/); // Running is 15 base, no media bonus = 15 total
-    assert.match(res.broadcastText, /\*Points Earned\*: \*\+15 pts\*/);
+    assert.match(res.broadcastText, /\*Points\*: \*\+15 pts\*/);
     assert.strictEqual(res.broadcastMedia, null);
     
     const allWorkouts = db.prepare('SELECT * FROM workouts WHERE player_phone = ?').all(testPhone);
