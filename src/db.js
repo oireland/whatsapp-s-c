@@ -27,6 +27,36 @@ db.pragma('journal_mode = WAL');
 const schema = fs.readFileSync(schemaPath, 'utf8');
 db.exec(schema);
 
+// Migration: Add posted_to_group column to workouts if it doesn't exist
+try {
+  db.prepare("ALTER TABLE workouts ADD COLUMN posted_to_group INTEGER DEFAULT 0").run();
+  console.log("Migration: Added 'posted_to_group' column to 'workouts' table.");
+} catch (err) {
+  if (!err.message.includes('duplicate column name') && !err.message.includes('already exists')) {
+    console.error("Migration Error:", err);
+  }
+}
+
+// Migration: Add media_data column to workouts if it doesn't exist
+try {
+  db.prepare("ALTER TABLE workouts ADD COLUMN media_data TEXT").run();
+  console.log("Migration: Added 'media_data' column to 'workouts' table.");
+} catch (err) {
+  if (!err.message.includes('duplicate column name') && !err.message.includes('already exists')) {
+    console.error("Migration Error:", err);
+  }
+}
+
+// Migration: Add media_mimetype column to workouts if it doesn't exist
+try {
+  db.prepare("ALTER TABLE workouts ADD COLUMN media_mimetype TEXT").run();
+  console.log("Migration: Added 'media_mimetype' column to 'workouts' table.");
+} catch (err) {
+  if (!err.message.includes('duplicate column name') && !err.message.includes('already exists')) {
+    console.error("Migration Error:", err);
+  }
+}
+
 /**
  * Get player details by phone number
  */
@@ -83,12 +113,12 @@ export function deleteSessionState(phone) {
 /**
  * Record a logged workout
  */
-export function createWorkout(phone, type, duration, rpe, notes, mediaKey, points) {
+export function createWorkout(phone, type, duration, rpe, notes, mediaKey, points, mediaData = null, mediaMimetype = null) {
   const stmt = db.prepare(`
-    INSERT INTO workouts (player_phone, workout_type, duration_minutes, rpe, notes, media_key, points)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO workouts (player_phone, workout_type, duration_minutes, rpe, notes, media_key, points, media_data, media_mimetype)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  return stmt.run(phone, type, duration, rpe, notes, mediaKey, points);
+  return stmt.run(phone, type, duration, rpe, notes, mediaKey, points, mediaData, mediaMimetype);
 }
 
 /**
@@ -115,6 +145,28 @@ export function updatePlayer(phone, name, position) {
     WHERE phone_number = ?
   `);
   return stmt.run(name, position, phone);
+}
+
+/**
+ * Mark a workout as posted to the group (and clear raw media data to save space)
+ */
+export function markWorkoutAsPosted(workoutId) {
+  const stmt = db.prepare('UPDATE workouts SET posted_to_group = 1, media_data = NULL WHERE id = ?');
+  return stmt.run(workoutId);
+}
+
+/**
+ * Fetch all workouts that have not been posted to the group yet
+ */
+export function getUnpostedWorkouts() {
+  const stmt = db.prepare(`
+    SELECT w.*, p.name, p.position 
+    FROM workouts w
+    JOIN players p ON w.player_phone = p.phone_number
+    WHERE w.posted_to_group = 0
+    ORDER BY w.created_at ASC
+  `);
+  return stmt.all();
 }
 
 export default db;

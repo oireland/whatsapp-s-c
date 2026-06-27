@@ -3,8 +3,8 @@ import path from 'path';
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth, MessageMedia } = pkg;
 import qrcode from 'qrcode-terminal';
-import { handleIncomingMessage } from './stateMachine.js';
-import { getSessionState } from './db.js';
+import { handleIncomingMessage, formatWorkoutBroadcastText } from './stateMachine.js';
+import { getSessionState, getUnpostedWorkouts, markWorkoutAsPosted } from './db.js';
 import { initWeeklyScheduler } from './scheduler.js';
 import { startServer } from './server.js';
 
@@ -40,9 +40,78 @@ client.on('qr', (qr) => {
   qrcode.generate(qr, { small: true });
 });
 
+/**
+ * Helper to retry sending any workouts that failed to broadcast to the group feed
+ */
+async function retryPendingBroadcasts(client) {
+  const feedGroupId = process.env.FEED_GROUP_ID;
+  if (!feedGroupId || feedGroupId === 'dummy-feed-group-id@g.us') {
+    console.warn('⚠️ [Retry Broadcast] Skipping: FEED_GROUP_ID is not configured.');
+    return;
+  }
+
+  try {
+    const unposted = getUnpostedWorkouts();
+    if (unposted.length === 0) {
+      return;
+    }
+
+    console.log(`🔄 [Retry Broadcast] Found ${unposted.length} pending workouts to post...`);
+
+    for (const workout of unposted) {
+      const text = formatWorkoutBroadcastText(
+        workout.name,
+        workout.position,
+        workout.workout_type,
+        workout.duration_minutes,
+        workout.rpe,
+        workout.notes,
+        workout.points,
+        workout.media_key === 'media_attached'
+      );
+      
+      let mediaToBroadcast = null;
+      if (workout.media_data && workout.media_mimetype) {
+        mediaToBroadcast = new MessageMedia(
+          workout.media_mimetype,
+          workout.media_data,
+          'workout_image.jpg'
+        );
+      }
+      
+      try {
+        console.log(`📢 [Retry Broadcast] Posting workout ID ${workout.id} for player ${workout.name}...`);
+        if (mediaToBroadcast) {
+          await client.sendMessage(feedGroupId, mediaToBroadcast, { 
+            caption: text,
+            sendSeen: false
+          });
+        } else {
+          await client.sendMessage(feedGroupId, text, { sendSeen: false });
+        }
+        markWorkoutAsPosted(workout.id);
+        console.log(`✅ [Retry Broadcast] Successfully posted workout ID ${workout.id}.`);
+      } catch (err) {
+        console.error(`❌ [Retry Broadcast] Failed to post workout ID ${workout.id}:`, err.message);
+        break; // Stop loop if client is having network/protocol issues
+      }
+    }
+  } catch (err) {
+    console.error('❌ [Retry Broadcast] Error processing unposted workouts:', err);
+  }
+}
+
 // Ready event
 client.on('ready', async () => {
   console.log('\n✅ WhatsApp client is ready and connected!');
+
+  // Retry any pending broadcasts on startup
+  retryPendingBroadcasts(client);
+
+  // Set up periodic interval to retry every 10 minutes
+  setInterval(() => {
+    retryPendingBroadcasts(client);
+  }, 10 * 60 * 1000);
   
   // List all joined groups on startup to help find FEED_GROUP_ID
   try {
@@ -187,6 +256,18 @@ client.on('message_create', async (message) => {
       }
       return;
     }
+
+    if (cmd === '!dev-retry') {
+      console.log(`🛠️ [Dev Command] Manually triggering retry for pending broadcasts...`);
+      try {
+        await retryPendingBroadcasts(client);
+        await client.sendMessage(message.from, `✅ Manual retry triggered. Check server logs for details.`);
+      } catch (err) {
+        console.error('Failed manual retry of pending broadcasts:', err);
+        await client.sendMessage(message.from, `❌ Error during manual retry: ${err.message}`);
+      }
+      return;
+    }
   }
 
   try {
@@ -209,14 +290,18 @@ client.on('message_create', async (message) => {
     const result = await handleIncomingMessage(sender, body, media);
     console.log(`🧠 [State Machine Result] Reply text generated: ${result.replyText ? 'Yes' : 'No'} | Log success: ${result.logSuccessful ? 'Yes' : 'No'}`);
 
-    // Send reply to sender
+    // Send reply to sender (isolated in its own try/catch to prevent blocking broadcast on failure)
     if (result.replyText) {
-      console.log(`📤 [Sending Reply] Sending text to ${sender}...`);
-      await client.sendMessage(sender, result.replyText);
-      console.log(`📤 [Reply Sent] Successfully replied to ${sender}`);
+      try {
+        console.log(`📤 [Sending Reply] Sending text to ${sender}...`);
+        await client.sendMessage(sender, result.replyText);
+        console.log(`📤 [Reply Sent] Successfully replied to ${sender}`);
+      } catch (replyErr) {
+        console.error(`❌ [Reply Error] Failed to send reply to sender ${sender}:`, replyErr.message);
+      }
     }
 
-    // If workout logged successfully, broadcast it to the S&C feed group
+    // If workout logged successfully, broadcast it to the S&C feed group (isolated in its own try/catch)
     if (result.logSuccessful && result.broadcastText) {
       const feedGroupId = process.env.FEED_GROUP_ID;
       
@@ -241,15 +326,21 @@ client.on('message_create', async (message) => {
             });
           }
           console.log(`📢 [Broadcast Complete] Workout posted for ${sender}`);
+          
+          // Mark workout as posted in database
+          if (result.workoutId) {
+            markWorkoutAsPosted(result.workoutId);
+            console.log(`💾 [DB] Marked workout ID ${result.workoutId} as posted to group.`);
+          }
         } catch (broadcastErr) {
-          console.error(`❌ [Broadcast Error] Failed to send workout update to group ${feedGroupId}:`, broadcastErr);
+          console.error(`❌ [Broadcast Error] Failed to send workout update to group ${feedGroupId}:`, broadcastErr.message);
         }
       } else {
         console.warn('⚠️ [Broadcast Skipped] Workout log was NOT broadcasted: FEED_GROUP_ID is not configured in .env');
       }
     }
   } catch (err) {
-    console.error('❌ [Error] Failed to process incoming DM:', err);
+    console.error('❌ [Error] Failed to process incoming DM:', err.message || err);
   }
 });
 

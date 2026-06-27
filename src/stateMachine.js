@@ -17,6 +17,20 @@ const WORKOUT_TYPES = {
 };
 
 /**
+ * Format a workout broadcast message for the group chat
+ */
+export function formatWorkoutBroadcastText(name, position, workoutType, duration, rpe, notes, points, hasMedia) {
+  const notesText = notes ? `\n📝 *Notes*: "${notes}"` : '';
+  const mediaBonusText = hasMedia ? ' (+5 pt Media Bonus!)' : '';
+
+  return `🔥 *${name.toUpperCase()}*\n` +
+    `_Position: ${position}_\n\n` +
+    `🏆 *Type*: ${workoutType}\n` +
+    `⏱️ *Duration*: ${duration} mins (RPE: ${rpe}/10)${notesText}\n\n` +
+    `📈 *Points*: *+${points} pts*${mediaBonusText}`;
+}
+
+/**
  * Main handler for incoming messages from players
  * @param {string} phone - Sender's phone number (e.g. '447123456789@c.us')
  * @param {string} text - Incoming message text
@@ -231,34 +245,39 @@ export async function handleIncomingMessage(phone, text, media = null) {
       }
 
       // Save workout record
-      createWorkout(
+      const dbResult = createWorkout(
         phone,
         typeInfo.name,
         tempData.duration,
         tempData.rpe,
         tempData.notes,
         hasMedia ? 'media_attached' : null, // Store simple flag or key
-        points
+        points,
+        hasMedia ? media.data : null,
+        hasMedia ? media.mimetype : null
       );
 
       // Clean up state
       deleteSessionState(phone);
 
       // Format broadcast message for the Feed Group
-      const notesText = tempData.notes ? `\n📝 *Notes*: "${tempData.notes}"` : '';
-      const mediaBonusText = hasMedia ? ' (+5 pt Media Bonus!)' : '';
-
-      const broadcastText = `🔥 *${player.name.toUpperCase()}*\n` +
-        `_Position: ${player.position}_\n\n` +
-        `🏆 *Type*: ${typeInfo.name}\n` +
-        `⏱️ *Duration*: ${tempData.duration} mins (RPE: ${tempData.rpe}/10)${notesText}\n\n` +
-        `📈 *Points*: *+${points} pts*${mediaBonusText}`;
+      const broadcastText = formatWorkoutBroadcastText(
+        player.name,
+        player.position,
+        typeInfo.name,
+        tempData.duration,
+        tempData.rpe,
+        tempData.notes,
+        points,
+        hasMedia
+      );
 
       return {
         replyText: `🏋️‍♂️ *Workout Logged Successfully!*\n\nPoints Earned: *+${points} pts*.\nYour update has been sent to the group feed. Keep up the good work! 🚀`,
         broadcastText: broadcastText,
         broadcastMedia: media, // Forward the media object so index.js can send it
-        logSuccessful: true
+        logSuccessful: true,
+        workoutId: dbResult.lastInsertRowid
       };
     }
 

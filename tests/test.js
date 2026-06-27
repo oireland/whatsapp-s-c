@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 process.env.NODE_ENV = 'test';
 
 // 2. Import helper database methods and state machine
-import db, { getPlayer, getSessionState, createPlayer, saveSessionState } from '../src/db.js';
+import db, { getPlayer, getSessionState, createPlayer, saveSessionState, getUnpostedWorkouts, markWorkoutAsPosted, createWorkout } from '../src/db.js';
 import { handleIncomingMessage } from '../src/stateMachine.js';
 import { generateWeeklyReport } from '../src/scheduler.js';
 
@@ -184,6 +184,47 @@ async function runTests() {
     assert.match(report, /Total Workouts: \*3\*/);
     assert.match(report, /Total Grind Time: \*165 mins\*/);
     console.log('✅ Weekly highlights contains correct summaries and leaderboard rankings: OK');
+
+    // --- TEST 6: BROADCAST RETRY TRACKING ---
+    console.log('\n--- Test 6: Broadcast Retry Tracking ---');
+    // Insert a workout with media data
+    const mediaResult = createWorkout(
+      testPhone,
+      'Gym / Weights 🏋️‍♂️',
+      60,
+      8,
+      'test workout with media',
+      'media_attached',
+      15,
+      'base64imagecontent',
+      'image/jpeg'
+    );
+    
+    const workoutId = mediaResult.lastInsertRowid;
+    assert.ok(workoutId);
+    
+    // Check unposted workouts contains this new one
+    const unposted = getUnpostedWorkouts();
+    const testWorkout = unposted.find(w => w.id === workoutId);
+    assert.ok(testWorkout);
+    assert.strictEqual(testWorkout.posted_to_group, 0);
+    assert.strictEqual(testWorkout.media_data, 'base64imagecontent');
+    assert.strictEqual(testWorkout.media_mimetype, 'image/jpeg');
+    console.log('✅ Saving media data to database for retry: OK');
+    
+    // Mark as posted
+    markWorkoutAsPosted(workoutId);
+    
+    // Verify it is no longer returned in getUnpostedWorkouts
+    const updatedUnposted = getUnpostedWorkouts();
+    assert.strictEqual(updatedUnposted.some(w => w.id === workoutId), false);
+    
+    // Verify media data was deleted from the row to save space
+    const dbRow = db.prepare('SELECT * FROM workouts WHERE id = ?').get(workoutId);
+    assert.strictEqual(dbRow.posted_to_group, 1);
+    assert.strictEqual(dbRow.media_data, null);
+    assert.strictEqual(dbRow.media_mimetype, 'image/jpeg'); // we keep mimetype if needed, but data is cleared
+    console.log('✅ Media data cleanup on successful post: OK');
     
     console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY! 🎉');
     

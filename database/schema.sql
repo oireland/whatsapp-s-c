@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS workouts (
     notes TEXT,
     media_key TEXT,
     points INTEGER NOT NULL,
+    media_data TEXT,
+    media_mimetype TEXT,
+    posted_to_group INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (player_phone) REFERENCES players(phone_number)
 );
