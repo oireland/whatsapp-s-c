@@ -95,11 +95,14 @@ client.on('message_create', async (message) => {
     return;
   }
 
-  // DEV COMMANDS (Only available to ADMIN_PHONE_NUMBER)
+  // DEV COMMANDS (Only available to ADMIN_PHONE_NUMBER - supports comma-separated list of phone numbers or LIDs)
   if (message.body && message.body.trim().toLowerCase().startsWith('!dev-')) {
     try {
       const contact = await message.getContact();
-      const isAdmin = process.env.ADMIN_PHONE_NUMBER && contact.number === process.env.ADMIN_PHONE_NUMBER.trim();
+      const adminList = (process.env.ADMIN_PHONE_NUMBER || '').split(',').map(s => s.trim());
+      const isAdmin = adminList.some(adminId => 
+        adminId && (message.from.includes(adminId) || contact.number.includes(adminId))
+      );
       
       if (isAdmin) {
         const cmd = message.body.trim().toLowerCase();
