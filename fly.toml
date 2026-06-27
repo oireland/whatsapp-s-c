@@ -1,0 +1,15 @@
+# fly.toml app configuration file for WhatsApp S&C Bot
+
+app = "whatsapp-sandc-feed"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[mounts]
+  source = "sandc_data"
+  destination = "/data"
+
+[env]
+  DATA_DIR = "/data"
+  WEEKLY_SUMMARY_CRON = "0 19 * * 0"

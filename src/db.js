@@ -7,7 +7,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const dbName = process.env.NODE_ENV === 'test' ? 'whatsapp_sandc_test.db' : 'whatsapp_sandc.db';
-const dbPath = path.join(__dirname, '..', dbName);
+const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, '..');
+
+// Ensure data directory exists
+if (process.env.DATA_DIR && !fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+const dbPath = path.join(dataDir, dbName);
 const schemaPath = path.join(__dirname, '../database/schema.sql');
 
 // Open the database (creates it if it doesn't exist)
