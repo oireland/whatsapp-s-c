@@ -62,9 +62,10 @@ client.on('ready', async () => {
     console.error('Error fetching chats/groups:', err);
   }
 
-  // Initialize Sunday 7 PM highlights cron
+  // Initialize weekly highlights cron
   const feedGroupId = process.env.FEED_GROUP_ID;
-  initWeeklyScheduler(client, feedGroupId);
+  const cronExpression = process.env.WEEKLY_SUMMARY_CRON || '0 19 * * 0';
+  initWeeklyScheduler(client, feedGroupId, cronExpression);
 });
 
 // Handle incoming messages (using message_create to catch all events, including synced/read DMs)
