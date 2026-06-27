@@ -1,15 +1,32 @@
-# fly.toml app configuration file for WhatsApp S&C Bot
+# fly.toml app configuration file generated for imrfc-gym-bot on 2026-06-27T16:16:56Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "whatsapp-sandc-feed"
-primary_region = "lhr"
+app = 'imrfc-gym-bot'
+primary_region = 'lhr'
 
 [build]
-  dockerfile = "Dockerfile"
-
-[mounts]
-  source = "sandc_data"
-  destination = "/data"
+  dockerfile = 'Dockerfile'
 
 [env]
-  DATA_DIR = "/data"
-  WEEKLY_SUMMARY_CRON = "0 19 * * 0"
+  DATA_DIR = '/data'
+  WEEKLY_SUMMARY_CRON = '0 19 * * 0'
+
+[[mounts]]
+  source = 'sandc_data'
+  destination = '/data'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 256
