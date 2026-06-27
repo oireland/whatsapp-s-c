@@ -1,15 +1,24 @@
-# fly.toml app configuration file for WhatsApp S&C Bot
+# fly.toml app configuration file generated for whatsapp-sandc-feed-vivid-skylark-9983 on 2026-06-27T17:24:26+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "whatsapp-sandc-feed"
-primary_region = "lhr"
+app = 'whatsapp-sandc-feed'
+primary_region = 'lhr'
 
 [build]
-  dockerfile = "Dockerfile"
-
-[mounts]
-  source = "sandc_data"
-  destination = "/data"
+  dockerfile = 'Dockerfile'
 
 [env]
-  DATA_DIR = "/data"
-  WEEKLY_SUMMARY_CRON = "0 19 * * 0"
+  DATA_DIR = '/data'
+  WEEKLY_SUMMARY_CRON = '0 19 * * 0'
+
+[[mounts]]
+  source = 'sandc_data'
+  destination = '/data'
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024
