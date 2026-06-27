@@ -33,17 +33,35 @@ async function runTests() {
     // --- TEST 1: ONBOARDING ---
     console.log('\n--- Test 1: Onboarding Flow ---');
     
-    // Step 1: Send greeting when not registered
-    let res = await handleIncomingMessage(testPhone, 'Hello');
+    // Step 1: Send greeting when not registered with message ID msg123
+    let res = await handleIncomingMessage(testPhone, 'Hello', null, 'msg123');
     assert.match(res.replyText, /Welcome to the Uni Rugby S&C Bot/);
     assert.strictEqual(getSessionState(testPhone).step, 'ONBOARDING_NAME');
     console.log('✅ Unregistered greeting triggers onboarding: OK');
 
+    // Step 1.2: Process the same message ID msg123 again (duplicate event)
+    res = await handleIncomingMessage(testPhone, 'Hello', null, 'msg123');
+    assert.strictEqual(res.replyText, null);
+    assert.strictEqual(getSessionState(testPhone).step, 'ONBOARDING_NAME');
+    console.log('✅ Duplicate initiating message ID is correctly ignored: OK');
+
     // Step 1.5: Send a greeting/command like "hi" or "log" as name
     res = await handleIncomingMessage(testPhone, 'hi');
-    assert.match(res.replyText, /Please enter your name, not a greeting/);
+    assert.match(res.replyText, /What is your \*full name\*\?/);
     assert.strictEqual(getSessionState(testPhone).step, 'ONBOARDING_NAME');
     console.log('✅ Rejecting greetings/commands as name: OK');
+
+    // Step 1.6: Send a sentence/silly name
+    res = await handleIncomingMessage(testPhone, 'I want to log my workout today');
+    assert.match(res.replyText, /What is your \*full name\*\?/);
+    assert.strictEqual(getSessionState(testPhone).step, 'ONBOARDING_NAME');
+    console.log('✅ Rejecting sentence input as name: OK');
+
+    // Step 1.7: Send name containing numbers or special chars
+    res = await handleIncomingMessage(testPhone, 'John 123!');
+    assert.match(res.replyText, /What is your \*full name\*\?/);
+    assert.strictEqual(getSessionState(testPhone).step, 'ONBOARDING_NAME');
+    console.log('✅ Rejecting names with numbers/special characters: OK');
     
     // Step 2: Send name
     res = await handleIncomingMessage(testPhone, 'John Doe');

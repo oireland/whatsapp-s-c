@@ -37,7 +37,7 @@ export function formatWorkoutBroadcastText(name, position, workoutType, duration
  * @param {object|null} media - WhatsApp media object (if attached)
  * @returns {Promise<object>} - Response structure: { replyText, broadcastText, broadcastMedia, logSuccessful }
  */
-export async function handleIncomingMessage(phone, text, media = null) {
+export async function handleIncomingMessage(phone, text, media = null, msgId = null) {
   const cleanText = (text || '').trim();
   const lowerText = cleanText.toLowerCase();
 
@@ -58,23 +58,39 @@ export async function handleIncomingMessage(phone, text, media = null) {
   // A. ONBOARDING FLOW
   if (!player) {
     if (!state) {
-      // Start onboarding
-      saveSessionState(phone, 'ONBOARDING_NAME', {});
+      // Start onboarding, remember the message ID that initiated this flow
+      saveSessionState(phone, 'ONBOARDING_NAME', { initiating_msg_id: msgId });
       return {
         replyText: 'Welcome to the Uni Rugby S&C Bot! 🏉\nLet\'s get you set up. What is your full name?'
       };
     }
 
     if (state.step === 'ONBOARDING_NAME') {
-      const lowerName = cleanText.toLowerCase();
-      const isGreetingOrCmd = [
-        'hi', 'hello', 'hey', 'yo', 'start', 'help', 'menu', 
-        'register', 'signup', 'log', 'stats', 'cancel'
-      ].includes(lowerName);
-
-      if (!cleanText || isGreetingOrCmd) {
+      // Ignore the initiating message itself if it gets double-processed or synced
+      if (msgId && state.temp_data && state.temp_data.initiating_msg_id === msgId) {
+        console.log(`ℹ️ [State Machine] Ignoring initial onboarding trigger message ID: ${msgId} for name input.`);
         return {
-          replyText: 'Welcome! Let\'s get you set up. What is your full name? (Please enter your name, not a greeting like "hi" or "hello")'
+          replyText: null
+        };
+      }
+
+      const nameParts = cleanText.split(/\s+/);
+      const isValidFormat = /^[a-zA-Z\s\-']{2,30}$/.test(cleanText);
+      
+      const forbiddenWords = [
+        'hi', 'hello', 'hey', 'yo', 'start', 'help', 'menu', 
+        'register', 'signup', 'log', 'stats', 'cancel',
+        'i', 'want', 'to', 'log', 'my', 'workout', 'session', 
+        'today', 'gym', 'running', 'skills', 'recovery', 'pts', 
+        'points', 'grind', 'play', 'position'
+      ];
+      const hasForbiddenWord = nameParts.some(word => 
+        forbiddenWords.includes(word.toLowerCase())
+      );
+
+      if (!cleanText || !isValidFormat || hasForbiddenWord || nameParts.length > 4) {
+        return {
+          replyText: 'Welcome! Let\'s get you set up. What is your *full name*? (Please type your actual name, e.g. John Doe):'
         };
       }
       saveSessionState(phone, 'ONBOARDING_POSITION', { name: cleanText });

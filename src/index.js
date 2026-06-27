@@ -287,7 +287,7 @@ client.on('message_create', async (message) => {
 
     // Process message through state machine
     console.log(`🧠 [State Machine] Evaluating inputs...`);
-    const result = await handleIncomingMessage(sender, body, media);
+    const result = await handleIncomingMessage(sender, body, media, msgId);
     console.log(`🧠 [State Machine Result] Reply text generated: ${result.replyText ? 'Yes' : 'No'} | Log success: ${result.logSuccessful ? 'Yes' : 'No'}`);
 
     // Send reply to sender (isolated in its own try/catch to prevent blocking broadcast on failure)
