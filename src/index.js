@@ -6,6 +6,7 @@ import qrcode from 'qrcode-terminal';
 import { handleIncomingMessage } from './stateMachine.js';
 import { getSessionState } from './db.js';
 import { initWeeklyScheduler } from './scheduler.js';
+import { startServer } from './server.js';
 
 console.log('Initializing WhatsApp Strength & Conditioning Bot...');
 
@@ -260,6 +261,9 @@ client.on('auth_failure', (msg) => {
 client.on('disconnected', (reason) => {
   console.warn('⚠️ WhatsApp client was disconnected:', reason);
 });
+
+// Start the web dashboard
+startServer();
 
 // Start the client
 client.initialize().catch(err => {

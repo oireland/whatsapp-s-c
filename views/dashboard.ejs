@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S&C Bot Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light p-5">
+    <div class="container bg-white p-4 rounded shadow-sm">
+        <h1 class="mb-4">🏉 S&C Bot Admin Dashboard</h1>
+        
+        <table class="table table-striped align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Phone Number</th>
+                    <th>Workouts</th>
+                    <th>Total Points</th>
+                    <th>Name</th>
+                    <th>Position</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% players.forEach(player => { %>
+                    <tr>
+                        <form action="/edit" method="POST">
+                            <td>
+                                <%= player.phone_number %>
+                                <input type="hidden" name="phone_number" value="<%= player.phone_number %>">
+                            </td>
+                            <td><strong><%= player.total_workouts %></strong></td>
+                            <td><span class="badge bg-success"><%= player.total_points %> pts</span></td>
+                            <td>
+                                <input type="text" name="name" value="<%= player.name %>" class="form-control form-control-sm" required>
+                            </td>
+                            <td>
+                                <input type="text" name="position" value="<%= player.position %>" class="form-control form-control-sm" required>
+                            </td>
+                            <td>
+                                <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                            </td>
+                        </form>
+                    </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
