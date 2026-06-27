@@ -92,6 +92,10 @@ export function initWeeklyScheduler(client, feedGroupId, cronExpression = '0 19 
         console.error('Error broadcasting weekly report:', err);
       }
     });
-    console.log(`Weekly highlights scheduler initialized with cron: "${cronExpression}"`);
+    if (cronExpression === '0 19 * * 0') {
+      console.log('Weekly highlights scheduler initialized. Scheduled for: Sundays at 7:00 PM.');
+    } else {
+      console.log(`Weekly highlights scheduler initialized with cron: "${cronExpression}"`);
+    }
   });
 }
