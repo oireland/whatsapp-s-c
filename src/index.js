@@ -69,7 +69,21 @@ client.on('ready', async () => {
 
 // Handle incoming messages
 client.on('message', async (message) => {
-  // Only respond to personal direct messages (DMs), ignore groups/announcements
+  // If it's a group message, log its ID to help configure FEED_GROUP_ID
+  if (message.from.endsWith('@g.us')) {
+    try {
+      const chat = await message.getChat();
+      console.log(`\n📢 GROUP ID DETECTED:`);
+      console.log(`   Group Name: "${chat.name}"`);
+      console.log(`   Group ID:   "${chat.id._serialized}"`);
+      console.log(`====================================\n`);
+    } catch (err) {
+      // Ignore errors fetching group details
+    }
+    return;
+  }
+
+  // Only respond to personal direct messages (DMs), ignore other types
   if (!message.from.endsWith('@c.us')) {
     return;
   }
