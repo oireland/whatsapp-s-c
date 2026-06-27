@@ -53,7 +53,7 @@ app.post('/edit', (req, res) => {
 });
 
 export function startServer() {
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
         console.log(`🌐 Admin Dashboard running on port ${PORT}`);
     });
 }
