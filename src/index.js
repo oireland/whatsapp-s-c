@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import http from 'http';
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth, MessageMedia } = pkg;
 import qrcode from 'qrcode-terminal';
@@ -240,4 +241,13 @@ client.on('disconnected', (reason) => {
 // Start the client
 client.initialize().catch(err => {
   console.error('Failed to initialize WhatsApp client:', err);
+});
+
+// Start a simple HTTP keep-alive server for Render
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('S&C Bot is active\n');
+}).listen(PORT, () => {
+  console.log(`📡 Keep-alive HTTP server listening on port ${PORT}`);
 });
