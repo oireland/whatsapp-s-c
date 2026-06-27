@@ -8,6 +8,8 @@ import { initWeeklyScheduler } from './scheduler.js';
 
 console.log('Initializing WhatsApp Strength & Conditioning Bot...');
 
+let resolvedAdminJid = null;
+
 // Initialize WhatsApp client
 const client = new Client({
   authStrategy: new LocalAuth({
@@ -66,6 +68,22 @@ client.on('ready', async () => {
   const feedGroupId = process.env.FEED_GROUP_ID;
   const cronExpression = process.env.WEEKLY_SUMMARY_CRON || '0 19 * * 0';
   initWeeklyScheduler(client, feedGroupId, cronExpression);
+
+  // Resolve admin JID on startup
+  const adminPhone = process.env.ADMIN_PHONE_NUMBER;
+  if (adminPhone) {
+    try {
+      const numberId = await client.getNumberId(adminPhone);
+      if (numberId) {
+        resolvedAdminJid = numberId._serialized;
+        console.log(`🔑 Admin Phone Number ${adminPhone} resolved to JID: "${resolvedAdminJid}"`);
+      } else {
+        console.warn(`⚠️ Could not resolve JID for admin phone number: ${adminPhone}`);
+      }
+    } catch (err) {
+      console.error('❌ Failed to resolve admin phone JID on startup:', err);
+    }
+  }
 });
 
 // Handle incoming messages (using message_create to catch all events, including synced/read DMs)
@@ -95,20 +113,16 @@ client.on('message_create', async (message) => {
     return;
   }
 
-  // DEV COMMANDS (Authorized via a secret DEV_COMMAND_PASSWORD token in the message body)
+  // DEV COMMANDS (Only available to resolvedAdminJid resolved on startup)
   if (message.body && message.body.trim().toLowerCase().startsWith('!dev-')) {
-    const parts = message.body.trim().split(/\s+/);
-    const cmd = parts[0].toLowerCase();
-    const token = parts[1];
-
-    const expectedToken = (process.env.DEV_COMMAND_PASSWORD || '').trim();
-
-    // Verify token to prevent unauthorized execution
-    if (!expectedToken || token !== expectedToken) {
-      console.warn(`⚠️ [Unauthorized Dev Command] Attempted by ${message.from} with invalid or missing token.`);
+    const isAdmin = resolvedAdminJid && message.from === resolvedAdminJid;
+    
+    if (!isAdmin) {
+      console.warn(`⚠️ [Unauthorized Dev Command] Attempted by ${message.from}`);
       return;
     }
 
+    const cmd = message.body.trim().toLowerCase();
     const feedGroupId = process.env.FEED_GROUP_ID;
 
     if (cmd === '!dev-workout') {
