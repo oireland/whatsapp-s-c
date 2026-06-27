@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import pkg from 'whatsapp-web.js';
-const { Client, LocalAuth } = pkg;
+const { Client, LocalAuth, MessageMedia } = pkg;
 import qrcode from 'qrcode-terminal';
 import { handleIncomingMessage } from './stateMachine.js';
 import { getSessionState } from './db.js';
@@ -127,14 +127,28 @@ client.on('message_create', async (message) => {
       
       if (feedGroupId && feedGroupId !== 'dummy-feed-group-id@g.us') {
         console.log(`📢 [Broadcasting Workout] Posting update to feed group: ${feedGroupId}...`);
-        if (result.broadcastMedia) {
-          await client.sendMessage(feedGroupId, result.broadcastMedia, { 
-            caption: result.broadcastText 
-          });
-        } else {
-          await client.sendMessage(feedGroupId, result.broadcastText);
+        try {
+          if (result.broadcastMedia) {
+            // Re-instantiate MessageMedia to ensure it is recognized as a MessageMedia instance
+            const mediaToBroadcast = new MessageMedia(
+              result.broadcastMedia.mimetype,
+              result.broadcastMedia.data,
+              result.broadcastMedia.filename
+            );
+            
+            await client.sendMessage(feedGroupId, mediaToBroadcast, { 
+              caption: result.broadcastText,
+              sendSeen: false // Avoid "t: t" errors caused by marking group chats as read
+            });
+          } else {
+            await client.sendMessage(feedGroupId, result.broadcastText, {
+              sendSeen: false
+            });
+          }
+          console.log(`📢 [Broadcast Complete] Workout posted for ${sender}`);
+        } catch (broadcastErr) {
+          console.error(`❌ [Broadcast Error] Failed to send workout update to group ${feedGroupId}:`, broadcastErr);
         }
-        console.log(`📢 [Broadcast Complete] Workout posted for ${sender}`);
       } else {
         console.warn('⚠️ [Broadcast Skipped] Workout log was NOT broadcasted: FEED_GROUP_ID is not configured in .env');
       }
