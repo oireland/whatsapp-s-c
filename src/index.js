@@ -87,8 +87,9 @@ client.on('message_create', async (message) => {
     return;
   }
 
-  // Only respond to personal direct messages (DMs), ignore other types
-  if (!message.from.endsWith('@c.us')) {
+  // Only respond to personal direct messages (DMs), ignore other types (LID is standard for new WhatsApp DMs)
+  const isDM = message.from.endsWith('@c.us') || message.from.endsWith('@lid');
+  if (!isDM) {
     console.log(`ℹ️ [Ignored Message] Sender is not a personal chat contact (e.g. status or broadcast).`);
     return;
   }
